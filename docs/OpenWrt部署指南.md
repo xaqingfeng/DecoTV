@@ -206,6 +206,51 @@ tar czf decotv-data-backup.tgz -C /mnt/sda1/decotv/data .
 | 页面加载慢        | 首次延迟高   | 设备性能不足，迁移到更强主机           |
 | 端口冲突          | 启动失败     | 改端口 `-p 4000:3000`                  |
 | 时区错误          | 日志时间偏差 | 设置 `-e TZ=Asia/Shanghai`             |
+| 视频源验证失败    | ECONNREFUSED | 见下方"特殊网络环境问题"章节           |
+
+### 特殊网络环境问题 (Fake IP / Clash)
+
+如果在 OpenWrt 上部署了 OpenClash / Clash 等代理软件并开启了 **Fake IP 模式**，可能会遇到容器内无法连接外网的问题。
+
+**现象：**
+
+- 视频源验证失败，日志报错 `Error: connect ECONNREFUSED 198.18.x.x:443`。
+- `198.18.x.x` 是 Fake IP 的保留网段，说明容器解析到了 Fake IP 但无法路由出去。
+
+**解决方案：**
+
+**方案 A：使用 Host 网络模式（推荐）**
+让容器共享宿主机的网络栈，直接利用宿主机的代理规则。
+
+Docker Run:
+
+```bash
+docker run -d --name decotv --net=host ...
+```
+
+Docker Compose:
+
+```yaml
+services:
+  decotv-core:
+    network_mode: 'host'
+    # 注意：host 模式下 ports 映射无效，服务将直接监听宿主机的 3000 端口
+    # ports:
+    #   - '3000:3000'
+```
+
+**方案 B：指定 DNS**
+强制容器使用公共 DNS，绕过 OpenWrt 的 Fake IP DNS 劫持（前提是 53 端口未被强制劫持）。
+
+Docker Compose:
+
+```yaml
+services:
+  decotv-core:
+    dns:
+      - 223.5.5.5
+      - 8.8.8.8
+```
 
 诊断：
 

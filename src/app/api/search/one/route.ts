@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { resolveAdultFilter } from '@/lib/adult-filter';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
@@ -34,7 +35,16 @@ export async function GET(request: NextRequest) {
   }
 
   const config = await getConfig();
-  const apiSites = await getAvailableApiSites(authInfo.username);
+  let apiSites = await getAvailableApiSites(authInfo.username);
+
+  const shouldFilterAdult = resolveAdultFilter(
+    searchParams,
+    config.SiteConfig.DisableYellowFilter
+  );
+
+  if (shouldFilterAdult) {
+    apiSites = apiSites.filter((site) => !site.is_adult);
+  }
 
   try {
     // 根据 resourceId 查找对应的 API 站点
@@ -45,22 +55,27 @@ export async function GET(request: NextRequest) {
           error: `未找到指定的视频源: ${resourceId}`,
           result: null,
         },
-        { status: 404 }
+        {
+          status: 404,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+            'X-Adult-Filter': shouldFilterAdult ? 'enabled' : 'disabled',
+          },
+        }
       );
     }
 
     const results = await searchFromApi(targetSite, query);
     let result = results.filter((r) => r.title === query);
 
-    // 成人内容过滤
-    if (!config.SiteConfig.DisableYellowFilter) {
+    if (shouldFilterAdult) {
       result = result.filter((r) => {
         const typeName = r.type_name || '';
-        // 检查源是否标记为成人资源
         if (targetSite.is_adult) {
           return false;
         }
-        // 检查分类名称关键词
         return !yellowWords.some((word: string) => typeName.includes(word));
       });
     }
@@ -78,6 +93,7 @@ export async function GET(request: NextRequest) {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+            'X-Adult-Filter': shouldFilterAdult ? 'enabled' : 'disabled',
           },
         }
       );
@@ -93,6 +109,7 @@ export async function GET(request: NextRequest) {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+            'X-Adult-Filter': shouldFilterAdult ? 'enabled' : 'disabled',
           },
         }
       );
@@ -109,6 +126,7 @@ export async function GET(request: NextRequest) {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+          'X-Adult-Filter': shouldFilterAdult ? 'enabled' : 'disabled',
         },
       }
     );

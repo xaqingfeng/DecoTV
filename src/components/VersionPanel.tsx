@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Loader2,
   Plus,
   RefreshCw,
   X,
@@ -17,6 +18,11 @@ import { createPortal } from 'react-dom';
 
 import { changelog, ChangelogEntry } from '@/lib/changelog';
 import { CURRENT_VERSION } from '@/lib/version';
+import {
+  checkForUpdates,
+  UpdateStatus,
+  VersionCheckResult,
+} from '@/lib/version_check';
 // 版本面板组件
 
 interface VersionPanelProps {
@@ -41,6 +47,9 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
   const [hasUpdate, setIsHasUpdate] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string>('');
   const [showRemoteContent, setShowRemoteContent] = useState(false);
+  const [versionCheckResult, setVersionCheckResult] =
+    useState<VersionCheckResult | null>(null);
+  const [isCheckingVersion, setIsCheckingVersion] = useState(false);
   const UPDATE_REPO =
     process.env.NEXT_PUBLIC_UPDATE_REPO || 'Decohererk/DecoTV';
   const REPO_URL =
@@ -78,34 +87,59 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchRemoteChangelog();
+      doVersionCheck();
     }
   }, [isOpen]);
+
+  // 执行版本检测
+  const doVersionCheck = async () => {
+    setIsCheckingVersion(true);
+    try {
+      const result = await checkForUpdates();
+      setVersionCheckResult(result);
+      setIsHasUpdate(result.status === UpdateStatus.HAS_UPDATE);
+    } catch (error) {
+      console.error('版本检测失败:', error);
+    } finally {
+      setIsCheckingVersion(false);
+    }
+  };
 
   // 获取远程变更日志
   const fetchRemoteChangelog = async () => {
     try {
       if (!UPDATE_REPO) return;
-      const response = await fetch(
-        `https://raw.githubusercontent.com/${UPDATE_REPO}/main/CHANGELOG`
-      );
-      if (response.ok) {
-        const content = await response.text();
+
+      // 尝试多个镜像源
+      const urls = [
+        `https://raw.githubusercontent.com/${UPDATE_REPO}/main/CHANGELOG`,
+        `https://cdn.jsdelivr.net/gh/${UPDATE_REPO}@main/CHANGELOG`,
+        `https://fastly.jsdelivr.net/gh/${UPDATE_REPO}@main/CHANGELOG`,
+      ];
+
+      let content = '';
+      for (const url of urls) {
+        try {
+          const response = await fetch(`${url}?_t=${Date.now()}`, {
+            cache: 'no-store',
+          });
+          if (response.ok) {
+            content = await response.text();
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (content) {
         const parsed = parseChangelog(content);
         setRemoteChangelog(parsed);
 
-        // 检查是否有更新
+        // 设置最新版本号
         if (parsed.length > 0) {
-          const latest = parsed[0];
-          setLatestVersion(latest.version);
-          // 暂时禁用这个检查，使用新的时间戳比较逻辑
-          setIsHasUpdate(false);
+          setLatestVersion(parsed[0].version);
         }
-      } else {
-        console.error(
-          '获取远程变更日志失败:',
-          response.status,
-          response.statusText
-        );
       }
     } catch (error) {
       console.error('获取远程变更日志失败:', error);
@@ -350,13 +384,34 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
         {/* 内容区域 */}
         <div className='p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-140px)] sm:max-h-[calc(90vh-120px)]'>
           <div className='space-y-3 sm:space-y-6'>
-            {/* 远程更新信息 */}
-            {hasUpdate && (
+            {/* 版本检测状态 - 检测中 */}
+            {isCheckingVersion && (
+              <div className='bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/20 dark:to-slate-900/20 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4'>
+                <div className='flex items-center gap-3'>
+                  <div className='w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 dark:bg-gray-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
+                    <Loader2 className='w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400 animate-spin' />
+                  </div>
+                  <div className='min-w-0 flex-1'>
+                    <h4 className='text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300'>
+                      正在检测版本...
+                    </h4>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 远程更新信息 - 有新版本 */}
+            {!isCheckingVersion && hasUpdate && (
               <div className='bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 sm:p-4'>
                 <div className='flex flex-col gap-3'>
                   <div className='flex items-center gap-2 sm:gap-3'>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 dark:bg-yellow-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
+                    <div className='relative w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 dark:bg-yellow-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
                       <Download className='w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 dark:text-yellow-400' />
+                      {/* 脉冲光点 */}
+                      <span className='absolute -top-0.5 -right-0.5 flex h-3 w-3'>
+                        <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75'></span>
+                        <span className='relative inline-flex rounded-full h-3 w-3 bg-orange-500'></span>
+                      </span>
                     </div>
                     <div className='min-w-0 flex-1'>
                       <h4 className='text-sm sm:text-base font-semibold text-yellow-800 dark:text-yellow-200'>
@@ -365,6 +420,11 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
                       <p className='text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 break-all'>
                         v{CURRENT_VERSION} → v{latestVersion}
                       </p>
+                      {versionCheckResult?.formattedRemoteTime && (
+                        <p className='text-xs text-yellow-600 dark:text-yellow-400 mt-1'>
+                          发布时间: {versionCheckResult.formattedRemoteTime}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <a
@@ -381,37 +441,78 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({
             )}
 
             {/* 当前为最新版本信息 */}
-            {!hasUpdate && (
-              <div className='bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4'>
-                <div className='flex flex-col gap-3'>
-                  <div className='flex items-center gap-2 sm:gap-3'>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 bg-green-100 dark:bg-green-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
-                      <CheckCircle className='w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400' />
+            {!isCheckingVersion &&
+              !hasUpdate &&
+              versionCheckResult?.status === UpdateStatus.NO_UPDATE && (
+                <div className='bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4'>
+                  <div className='flex flex-col gap-3'>
+                    <div className='flex items-center gap-2 sm:gap-3'>
+                      <div className='relative w-8 h-8 sm:w-10 sm:h-10 bg-green-100 dark:bg-green-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
+                        <CheckCircle className='w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400' />
+                        {/* 绿色光点 */}
+                        <span className='absolute -top-0.5 -right-0.5 flex h-3 w-3'>
+                          <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
+                          <span className='relative inline-flex rounded-full h-3 w-3 bg-emerald-500'></span>
+                        </span>
+                      </div>
+                      <div className='min-w-0 flex-1'>
+                        <h4 className='text-sm sm:text-base font-semibold text-green-800 dark:text-green-200'>
+                          当前为最新版本
+                        </h4>
+                        <p className='text-xs sm:text-sm text-green-700 dark:text-green-300 break-all'>
+                          已是最新版本 v{CURRENT_VERSION}
+                        </p>
+                        {versionCheckResult?.formattedLocalTime && (
+                          <p className='text-xs text-green-600 dark:text-green-400 mt-1'>
+                            构建时间: {versionCheckResult.formattedLocalTime}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className='min-w-0 flex-1'>
-                      <h4 className='text-sm sm:text-base font-semibold text-green-800 dark:text-green-200'>
-                        当前为最新版本
-                      </h4>
-                      <p className='text-xs sm:text-sm text-green-700 dark:text-green-300 break-all'>
-                        已是最新版本 v{CURRENT_VERSION}
-                      </p>
-                    </div>
+                    <a
+                      href={REPO_URL || '#'}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm rounded-lg transition-colors shadow-sm w-full'
+                    >
+                      <CheckCircle className='w-3 h-3 sm:w-4 sm:h-4' />
+                      前往仓库
+                    </a>
                   </div>
-                  <a
-                    href={REPO_URL || '#'}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm rounded-lg transition-colors shadow-sm w-full'
-                  >
-                    <CheckCircle className='w-3 h-3 sm:w-4 sm:h-4' />
-                    前往仓库
-                  </a>
                 </div>
-              </div>
-            )}
+              )}
+
+            {/* 检测失败 */}
+            {!isCheckingVersion &&
+              versionCheckResult?.status === UpdateStatus.FETCH_FAILED && (
+                <div className='bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 sm:p-4'>
+                  <div className='flex flex-col gap-3'>
+                    <div className='flex items-center gap-2 sm:gap-3'>
+                      <div className='relative w-8 h-8 sm:w-10 sm:h-10 bg-red-100 dark:bg-red-800/40 rounded-full flex items-center justify-center flex-shrink-0'>
+                        <X className='w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-400' />
+                      </div>
+                      <div className='min-w-0 flex-1'>
+                        <h4 className='text-sm sm:text-base font-semibold text-red-800 dark:text-red-200'>
+                          版本检测失败
+                        </h4>
+                        <p className='text-xs sm:text-sm text-red-700 dark:text-red-300 break-all'>
+                          {versionCheckResult?.error || '无法连接到更新服务器'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={doVersionCheck}
+                      className='inline-flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm rounded-lg transition-colors shadow-sm w-full'
+                    >
+                      <RefreshCw className='w-3 h-3 sm:w-4 sm:h-4' />
+                      重试检测
+                    </button>
+                  </div>
+                </div>
+              )}
 
             {/* 远程可更新内容 */}
-            {hasUpdate && (
+            {!isCheckingVersion && hasUpdate && (
               <div className='space-y-4'>
                 <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
                   <h4 className='text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2'>

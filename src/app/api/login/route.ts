@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       const cookieValue = await generateAuthCookie(
         undefined,
         password,
-        'user',
+        'owner',
         true
       ); // localstorage 模式包含 password
       const expires = new Date();

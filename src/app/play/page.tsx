@@ -1906,18 +1906,43 @@ function PlayPageClient() {
     <PageLayout activePath='/play'>
       <div className='flex flex-col gap-3 py-4 px-5 lg:px-[3rem] 2xl:px-20'>
         {/* 第一行：影片标题 */}
-        <div className='py-1'>
-          <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
+        <div className='py-1 flex justify-between items-center gap-2'>
+          <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100 truncate'>
             {videoTitle || '影片标题'}
             {totalEpisodes > 1 && (
-              <span className='text-gray-500 dark:text-gray-400'>
-                {` > ${
+              <span className='text-gray-500 dark:text-gray-400 ml-2 text-base font-normal'>
+                {`> ${
                   detail?.episodes_titles?.[currentEpisodeIndex] ||
                   `第 ${currentEpisodeIndex + 1} 集`
                 }`}
               </span>
             )}
           </h1>
+
+          {/* 移动端跳过设置按钮 */}
+          <button
+            onClick={() => setIsSkipConfigPanelOpen(true)}
+            className={`lg:hidden flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              skipConfig.enable
+                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 ring-1 ring-purple-500/20'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 ring-1 ring-gray-500/10'
+            }`}
+          >
+            <svg
+              className='w-3.5 h-3.5'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M13 5l7 7-7 7M5 5l7 7-7 7'
+              />
+            </svg>
+            <span>{skipConfig.enable ? '已跳过' : '跳过'}</span>
+          </button>
         </div>
         {/* 第二行：播放器和选集 */}
         <div className='space-y-2'>
@@ -1963,35 +1988,6 @@ function PlayPageClient() {
                 isEpisodeSelectorCollapsed ? '显示选集面板' : '隐藏选集面板'
               }
             >
-              {/* 移动端跳过设置浮动按钮 */}
-              <button
-                onClick={() => setIsSkipConfigPanelOpen(true)}
-                className={`lg:hidden fixed bottom-20 right-5 z-50 p-4 rounded-full shadow-2xl transition-all duration-200 transform hover:scale-110 ${
-                  skipConfig.enable
-                    ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-600 text-white animate-pulse'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-gray-600'
-                }`}
-                title='跳过设置'
-              >
-                <svg
-                  className='w-6 h-6'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M13 5l7 7-7 7M5 5l7 7-7 7'
-                  />
-                </svg>
-                {skipConfig.enable && (
-                  <div className='absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full flex items-center justify-center'>
-                    <span className='text-white text-xs font-bold'>✓</span>
-                  </div>
-                )}
-              </button>
               <svg
                 className={`w-3.5 h-3.5 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
                   isEpisodeSelectorCollapsed ? 'rotate-180' : 'rotate-0'

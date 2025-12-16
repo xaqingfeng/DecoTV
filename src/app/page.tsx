@@ -37,7 +37,7 @@ function HomeClient() {
     BangumiCalendarData[]
   >([]);
   const [loading, setLoading] = useState(true);
-  const { announcement } = useSite();
+  const { siteName, announcement } = useSite();
 
   const [showAnnouncement, setShowAnnouncement] = useState(false);
 
@@ -178,7 +178,7 @@ function HomeClient() {
         <div className='flex flex-col items-center justify-center text-center px-4'>
           <div className='relative group cursor-default'>
             <h1 className='text-6xl sm:text-8xl font-black tracking-tighter deco-brand drop-shadow-2xl select-none transition-transform duration-500 group-hover:scale-105'>
-              DecoTV
+              {siteName || 'DecoTV'}
             </h1>
             <div className='absolute -inset-8 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 blur-2xl -z-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
           </div>

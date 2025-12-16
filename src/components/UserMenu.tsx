@@ -1114,8 +1114,22 @@ export const UserMenu: React.FC = () => {
         >
           <User className='w-full h-full' />
         </button>
-        {updateStatus?.status === UpdateStatus.HAS_UPDATE && (
-          <div className='absolute top-[2px] right-[2px] w-2 h-2 bg-yellow-500 rounded-full'></div>
+        {/* 版本状态光点指示器 */}
+        {!isChecking && updateStatus && (
+          <span className='absolute top-0 right-0 flex h-2.5 w-2.5'>
+            {updateStatus.status === UpdateStatus.HAS_UPDATE && (
+              <>
+                <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75'></span>
+                <span className='relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500'></span>
+              </>
+            )}
+            {updateStatus.status === UpdateStatus.NO_UPDATE && (
+              <>
+                <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
+                <span className='relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500'></span>
+              </>
+            )}
+          </span>
         )}
       </div>
 

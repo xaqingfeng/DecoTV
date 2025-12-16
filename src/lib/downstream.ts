@@ -33,7 +33,7 @@ async function searchWithCache(
   query: string,
   page: number,
   url: string,
-  timeoutMs = 8000
+  timeoutMs = 5000
 ): Promise<{ results: SearchResult[]; pageCount?: number }> {
   // 先查缓存
   const cached = getCachedSearchPage(apiSite.key, query, page);
@@ -162,7 +162,7 @@ export async function searchFromApi(
       query,
       1,
       apiUrl,
-      8000
+      5000
     );
     const results = firstPageResult.results;
     const pageCountFromFirst = firstPageResult.pageCount;
@@ -193,7 +193,7 @@ export async function searchFromApi(
             query,
             page,
             pageUrl,
-            8000
+            5000
           );
           return pageResult.results;
         })();

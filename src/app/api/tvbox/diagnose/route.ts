@@ -44,6 +44,15 @@ function isPrivateHost(urlStr: string): boolean {
   }
 }
 
+function extractSpiderUrl(raw: string): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  const semicolonIndex = trimmed.indexOf(';');
+  if (semicolonIndex === -1) return trimmed;
+  return trimmed.slice(0, semicolonIndex).trim();
+}
+
 async function tryFetchHead(
   url: string,
   timeoutMs = 3500
@@ -128,37 +137,45 @@ export async function GET(req: NextRequest) {
         result.issues.push(`found ${privateApis} private api urls`);
       }
       if (typeof spider === 'string' && spider) {
+        const resolvedSpiderUrl = extractSpiderUrl(spider);
         result.spider = spider;
-        result.spiderPrivate = isPrivateHost(spider);
-        if (result.spiderPrivate) {
-          result.issues.push('spider url is private/not public');
-        } else if (
-          spider.startsWith('http://') ||
-          spider.startsWith('https://')
-        ) {
-          const spiderCheck = await tryFetchHead(spider, 5000);
-          result.spiderReachable = spiderCheck.ok;
-          result.spiderStatus = spiderCheck.status;
-          if (!spiderCheck.ok) {
-            // 优化错误提示，提供更详细的诊断信息
-            if (spiderCheck.status === 404) {
-              result.issues.push(
-                `spider 源文件不存在 (404) - 该 JAR 源可能已失效，建议使用 JAR 源诊断工具查找可用源`
-              );
-            } else if (spiderCheck.status === 403) {
-              result.issues.push(
-                `spider 访问被拒绝 (403) - 该源可能需要代理访问或已限制访问`
-              );
-            } else if (spiderCheck.error?.includes('timeout')) {
-              result.issues.push(
-                `spider 访问超时 - 网络延迟较高或源不可达，建议检查网络环境或更换源`
-              );
-            } else {
-              result.issues.push(
-                `spider 不可用: ${
-                  spiderCheck.status || spiderCheck.error
-                } - 建议使用 JAR 源诊断工具测试可用源`
-              );
+        result.spiderUrl = resolvedSpiderUrl;
+
+        if (!resolvedSpiderUrl) {
+          result.issues.push('spider 字段存在但未解析到有效地址');
+        } else {
+          result.spiderPrivate = isPrivateHost(resolvedSpiderUrl);
+          if (result.spiderPrivate) {
+            result.issues.push('spider url is private/not public');
+          } else if (
+            resolvedSpiderUrl.startsWith('http://') ||
+            resolvedSpiderUrl.startsWith('https://')
+          ) {
+            const spiderCheck = await tryFetchHead(resolvedSpiderUrl, 5000);
+            result.spiderReachable = spiderCheck.ok;
+            result.spiderStatus = spiderCheck.status;
+
+            if (!spiderCheck.ok) {
+              // 优化错误提示，提供更详细的诊断信息
+              if (spiderCheck.status === 404) {
+                result.issues.push(
+                  `spider 源文件不存在 (404) - 该 JAR 源可能已失效，建议使用 JAR 源诊断工具查找可用源`
+                );
+              } else if (spiderCheck.status === 403) {
+                result.issues.push(
+                  `spider 访问被拒绝 (403) - 该源可能需要代理访问或已限制访问`
+                );
+              } else if (spiderCheck.error?.includes('timeout')) {
+                result.issues.push(
+                  `spider 访问超时 - 网络延迟较高或源不可达，建议检查网络环境或更换源`
+                );
+              } else {
+                result.issues.push(
+                  `spider 不可用: ${
+                    spiderCheck.status || spiderCheck.error
+                  } - 建议使用 JAR 源诊断工具测试可用源`
+                );
+              }
             }
           }
         }
